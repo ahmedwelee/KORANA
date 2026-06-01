@@ -5,6 +5,7 @@ KoraNow is a full-stack football social + competitive platform for Morocco.
 ## Monorepo structure
 
 - `apps/mobile` - React Native + Expo app
+- `apps/web` - Next.js user-facing website
 - `apps/admin-web` - Next.js admin panel
 - `apps/api` - NestJS backend + Prisma
 - `packages/shared` - shared constants, enums, and DTO contracts
