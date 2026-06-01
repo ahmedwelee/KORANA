@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log*
+.env
+.env.*
+!.env.example
+coverage
+dist
+.next
+.expo
+apps/mobile/.expo
+apps/mobile/node_modules
+apps/admin-web/node_modules
+apps/api/node_modules

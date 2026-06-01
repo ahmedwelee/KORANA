@@ -1,0 +1,297 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PLAYER
+  CAPTAIN
+  ADMIN
+  FIELD_OWNER
+}
+
+enum Position {
+  GK
+  DEFENDER
+  MIDFIELDER
+  FORWARD
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  PRO
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum ChallengeVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum MatchFormat {
+  FIVE_V_FIVE
+  SIX_V_SIX
+  SEVEN_V_SEVEN
+}
+
+enum ChallengeStatus {
+  OPEN
+  REQUESTED
+  ACCEPTED
+  MATCH_ROOM_CREATED
+  FINISHED
+  CANCELED
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  TEAM_INVITE
+  CHALLENGE_REQUEST
+  CHALLENGE_ACCEPTED
+  ROOM_MESSAGE
+  MATCH_REMINDER
+  RATING_RECEIVED
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+model City {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  users       User[]
+  teams       Team[]
+  challenges  Challenge[]
+  reports     Report[]
+  createdAt   DateTime    @default(now())
+}
+
+model User {
+  id                 String               @id @default(uuid())
+  email              String               @unique
+  passwordHash       String?
+  phone              String?              @unique
+  name               String
+  age                Int?
+  avatarUrl          String?
+  role               UserRole             @default(PLAYER)
+  cityId             String
+  city               City                 @relation(fields: [cityId], references: [id])
+  position           Position?
+  skillLevel         SkillLevel           @default(BEGINNER)
+  rating             Float                @default(0)
+  matchesPlayed      Int                  @default(0)
+  wins               Int                  @default(0)
+  goals              Int                  @default(0)
+  assists            Int                  @default(0)
+  mvpCount           Int                  @default(0)
+  isVerified         Boolean              @default(false)
+  teamMemberships    TeamMember[]
+  captainedTeams     Team[]               @relation("team_captain")
+  sentFriendRequests FriendRequest[]      @relation("friend_request_sender")
+  recvFriendRequests FriendRequest[]      @relation("friend_request_receiver")
+  teamInvitesReceived TeamInvite[]      @relation("team_invited_user")
+  teamInvitesSent     TeamInvite[]      @relation("team_invited_by")
+  challengeRequests  ChallengeRequest[]
+  sentMessages       Message[]
+  sentNotifications  Notification[]       @relation("notification_sender")
+  recvNotifications  Notification[]       @relation("notification_receiver")
+  reportsCreated     Report[]             @relation("report_creator")
+  reportsResolved    Report[]             @relation("report_resolver")
+  ratingsGiven       Rating[]             @relation("rating_creator")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+}
+
+model Team {
+  id               String             @id @default(uuid())
+  name             String
+  logoUrl          String?
+  cityId           String
+  city             City               @relation(fields: [cityId], references: [id])
+  description      String?
+  level            SkillLevel         @default(BEGINNER)
+  captainId        String
+  captain          User               @relation("team_captain", fields: [captainId], references: [id])
+  isVerified       Boolean            @default(false)
+  rating           Float              @default(0)
+  wins             Int                @default(0)
+  losses           Int                @default(0)
+  members          TeamMember[]
+  invites          TeamInvite[]
+  createdChallenges Challenge[]       @relation("challenge_creator_team")
+  acceptedChallenges Challenge[]      @relation("challenge_accepted_team")
+  challengeRequests ChallengeRequest[]
+  ratingsReceived  Rating[]           @relation("rating_target_team")
+  ratingsGiven     Rating[]           @relation("rating_source_team")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([name, cityId])
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  teamId    String
+  userId    String
+  isCoCaptain Boolean @default(false)
+  joinedAt  DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+}
+
+model FriendRequest {
+  id         String       @id @default(uuid())
+  senderId   String
+  receiverId String
+  status     InviteStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  sender   User @relation("friend_request_sender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("friend_request_receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+}
+
+model TeamInvite {
+  id         String       @id @default(uuid())
+  teamId      String
+  invitedUserId String
+  invitedById String
+  status     InviteStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  team        Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedUser User @relation("team_invited_user", fields: [invitedUserId], references: [id], onDelete: Cascade)
+  invitedBy   User @relation("team_invited_by", fields: [invitedById], references: [id])
+}
+
+model Challenge {
+  id            String               @id @default(uuid())
+  title         String
+  cityId        String
+  city          City                 @relation(fields: [cityId], references: [id])
+  date          DateTime
+  timeLabel     String
+  format        MatchFormat
+  visibility    ChallengeVisibility
+  notes         String?
+  status        ChallengeStatus      @default(OPEN)
+  creatorTeamId String
+  creatorTeam   Team                 @relation("challenge_creator_team", fields: [creatorTeamId], references: [id])
+  acceptedTeamId String?
+  acceptedTeam  Team?                @relation("challenge_accepted_team", fields: [acceptedTeamId], references: [id])
+  requests      ChallengeRequest[]
+  matchRoom     MatchRoom?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model ChallengeRequest {
+  id          String       @id @default(uuid())
+  challengeId String
+  teamId      String
+  message     String?
+  status      InviteStatus @default(PENDING)
+  createdById String
+  createdBy   User         @relation(fields: [createdById], references: [id])
+  createdAt   DateTime     @default(now())
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, teamId])
+}
+
+model MatchRoom {
+  id           String    @id @default(uuid())
+  challengeId  String    @unique
+  challenge    Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  endsAt       DateTime
+  createdAt    DateTime  @default(now())
+  messages     Message[]
+}
+
+model Message {
+  id          String    @id @default(uuid())
+  roomId      String
+  senderId    String
+  content     String
+  createdAt   DateTime  @default(now())
+
+  room   MatchRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model Rating {
+  id                String   @id @default(uuid())
+  sourceTeamId      String
+  targetTeamId      String
+  challengeId       String
+  stars             Int
+  fairPlay          Int
+  punctuality       Int
+  competitiveLevel  Int
+  comment           String?
+  createdById       String
+  createdAt         DateTime @default(now())
+
+  sourceTeam Team @relation("rating_source_team", fields: [sourceTeamId], references: [id], onDelete: Cascade)
+  targetTeam Team @relation("rating_target_team", fields: [targetTeamId], references: [id], onDelete: Cascade)
+  createdBy  User @relation("rating_creator", fields: [createdById], references: [id])
+
+  @@unique([sourceTeamId, targetTeamId, challengeId])
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  type        NotificationType
+  receiverId  String
+  senderId    String?
+  title       String
+  body        String
+  payload     Json?
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  receiver User  @relation("notification_receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender   User? @relation("notification_sender", fields: [senderId], references: [id])
+}
+
+model Report {
+  id           String       @id @default(uuid())
+  reason       String
+  details      String?
+  targetUserId String?
+  targetTeamId String?
+  status       ReportStatus @default(OPEN)
+  cityId       String?
+  city         City?        @relation(fields: [cityId], references: [id])
+  createdById  String
+  resolvedById String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  createdBy User  @relation("report_creator", fields: [createdById], references: [id])
+  resolvedBy User? @relation("report_resolver", fields: [resolvedById], references: [id])
+}
